@@ -1,0 +1,10 @@
+{
+	"Name" : "Telecom Design",
+	"Commands":{
+		"Send":"AT$SF=",
+		"ID":"AT$I=10",
+		"PAC":"AT$I=11",
+		"Version":"AT/L"
+	},
+	"CommandVersion" : 1.1
+}
