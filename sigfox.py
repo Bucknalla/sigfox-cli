@@ -8,7 +8,7 @@ commandList = {}
 portSelection = None
 
 def getCommands(library):
-    cur_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
+    cur_dir = os.path.dirname(__file__) # Absolute Directory
     rel_path = "Config/AT_Libraries/" + library
     abs_file_path = os.path.join(cur_dir, rel_path)
     jsonFile = open(abs_file_path, "r")
@@ -36,7 +36,6 @@ def serialPorts():
         ports = glob.glob('/dev/tty.*')
     else:
         raise EnvironmentError('Unsupported platform')
-
     result = []
     for port in ports:
         try:
@@ -45,12 +44,15 @@ def serialPorts():
             result.append(port)
         except (OSError, serial.SerialException):
             pass
+	if not result:
+		print "No devices found..."
+		sys.exit()
     return result
-
 
 # Options for using Sigfox Modules
 
 class Sigfox:
+	
     def __init__(self, name, baud, library):
         self.name = name
         self.baud = baud
@@ -78,33 +80,44 @@ class Sigfox:
     # Retrieves Device ID
     def __getDeviceId(self):
         command = self.commands['ID'].encode('ascii', 'ignore')
-    	with serial.Serial(self.name, self.baud, timeout=5) as ser:
-    		ser.write(command+'\r')
-    		line = ser.readline()
-    		print line
+        try:
+        	with serial.Serial(self.name, self.baud, timeout=5) as ser:
+        		ser.write(command+'\r')
+        		line = ser.readline()
+        		print line
+        except serial.SerialException as e:
+            print 'Could not connect to device...'
 
     # Retrieves Device PAC Number
     def __getPAC(self):
         command = self.commands['PAC'].encode('ascii', 'ignore')
-    	with serial.Serial(self.name, self.baud, timeout=5) as ser:
-    		ser.write(command+'\r')
-    		line = ser.readline()
-    		print line
+        try:
+        	with serial.Serial(self.name, self.baud, timeout=5) as ser:
+        		ser.write(command+'\r')
+        		line = ser.readline()
+        		print line
+        except serial.SerialException as e:
+            print 'Could not connect to device...'
 
     # Retrieves Sigfox Library Version
     def __getLibraryVer(self):
-    	with serial.Serial(self.name, self.baud, timeout=5) as ser:
-    		ser.write(b'AT/L\r')
-    		line = ser.readline()
-    		print line
+        command = self.commands['Version'].encode('ascii', 'ignore')
+        try:
+        	with serial.Serial(self.name, self.baud, timeout=5) as ser:
+        		ser.write(command+'\r')
+        		line = ser.readline()
+        		print line
+        except serial.SerialException as e:
+            print 'Could not connect to device...'
 
     # Sends a 12 Byte Sigfox Message, encoded in Hexidecimal
     def __sendMessage(self):
         sigfoxPattern = re.compile("^[0-9A-F]{1,24}$")
+        command = self.commands['Send'].encode('ascii', 'ignore')
         payload = prompt.query("Message (Hexidecimal):", validators=[validators.RegexValidator(sigfoxPattern, 'Invalid Payload')])
-    	try:
+        try:
             with serial.Serial(self.name, self.baud, timeout=10) as ser:
-        		ser.write(b'AT$SF='+payload+'\r')
+        		ser.write(command+payload+'\r')
         		line = ser.readline()
         		print line
         except serial.SerialException as e:
@@ -112,11 +125,14 @@ class Sigfox:
 
     # Allows user to enter a custom command
     def __customCommand(self):
-    	with serial.Serial(self.name, self.baud, timeout=10) as ser:
-            command = prompt.query("Custom:")
-            ser.write(command+'\r')
-            line = ser.readline()
-            print line
+        command = prompt.query("Custom:")
+        try:
+            with serial.Serial(self.name, self.baud, timeout=10) as ser:
+                ser.write(command+'\r')
+                line = ser.readline()
+                print line
+        except serial.SerialException as e:
+            print 'Could not connect to device...'
 
     # Initalises the Configuration Settings
     def __config(self):
@@ -125,7 +141,8 @@ class Sigfox:
                         {'selector':'2','prompt':'Set Login Details'},
                         {'selector':'3','prompt':'Set AT Library'},
                         {'selector':'4','prompt':'Change Device'},
-                        {'selector':'5','prompt':'Back'}]
+                        {'selector':'5','prompt':'About'},
+                        {'selector':'0','prompt':'Back'}]
 
         config = int(prompt.options("Config:", configList))
 
@@ -146,6 +163,8 @@ class Sigfox:
             boardOption = prompt.options("Select Device:", boards)
             portSelection = boards[boardOption-1]
         elif config == 5:
+            self.displayAbout()
+        elif config == 0:
             setupBoard(False)
         else:
             return 'Error'
@@ -170,6 +189,14 @@ class Sigfox:
         options = os.listdir(abs_file_path)
         return options
 
+    def displayAbout(self):
+        with open("Config/about.txt", "r") as myfile:
+            artwork=myfile.read()
+        artwork.split('\n')
+        puts(colored.magenta(artwork))
+
+
+
 # Initalise Command Prompt
 def setupBoard(inital=True):
     global portSelection
@@ -185,16 +212,16 @@ def setupBoard(inital=True):
                     {'selector':'4','prompt':'Send Message'},
                     {'selector':'5','prompt':'Custom Command'},
                     {'selector':'6','prompt':'Config'},
-                    {'selector':'7','prompt':'Exit'}]
+                    {'selector':'0','prompt':'Exit'}]
 
     command = int(prompt.options("Command:", commandList))
 
-    if command == 7:
+    if command == 0:
         print "Exiting program..."
         sys.exit(0)
 
     if command != 6:
-        puts(colored.red('Initialising {0}'.format(portSelection)))
+        puts(colored.blue('Initialising {0}'.format(portSelection)))
 
     device = Sigfox(portSelection, baudRate, library)
     device.handleCommand(command)
